@@ -2,17 +2,55 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"math/rand/v2"
+	"os"
 )
 
 func main() {
 }
 
-func run() {
-	const SEED_1 uint64 = 85671395
-	const SEED_2 uint64 = 18429642
+func run() (error) {
+	var initMode int = -1
+	for {
+		initMode, _ = scanInput("初期値 { 自動生成(0) / 手動(1) } : ")
+		if initMode == 0 || initMode == 1 {
+			break
+		}
+		fmt.Println("入力が不正です")
+	}
 
-	r := rand.New(rand.NewPCG(SEED_1, SEED_2))
+	var init100Bits = make([]byte, 100)
+
+	if initMode == 0 {
+		const SEED_1 uint64 = 42
+		const SEED_2 uint64 = 18429642
+
+		r := rand.New(rand.NewPCG(SEED_1, SEED_2))
+
+		init100Bits = randomBits(r)
+
+		fmt.Println("ランダムな100ビットを生成しました")
+	} else {
+		buf, err := os.ReadFile("./init100Bits")
+		if err != nil {
+			return err
+		}
+
+		if len(buf) != 100 {
+			return errors.New("length of init100Bits must be 100")
+		}
+		
+		for i, v := range buf {
+			if v != '0' && v != '1' {
+				return errors.New("value of init100Bits must be 0 or 1")
+			}
+			init100Bits[i] = v - '0'
+		}
+
+		fmt.Println("./init100Bits を読み取りました")
+	}
+
 	
 }
 
@@ -55,4 +93,12 @@ func updateBits(oldBits []byte, rule byte) (newBits []byte, err error) {
 	}
 
 	return newBits, nil
+}
+
+// scanInput は、プロンプトを表示し、入力を文字列として取得する関数
+func scanInput(prompt string) (input int, err error) {
+	fmt.Print(prompt)
+	_, err = fmt.Scan(&input)
+
+	return input, err
 }
