@@ -2,8 +2,10 @@ package main
 
 import (
 	"bufio"
+	"bytes"
 	"errors"
 	"fmt"
+	"math/rand/v2"
 	"os"
 	"strings"
 )
@@ -34,7 +36,42 @@ func run() error {
 	if err != nil {
 		return err
 	}
+
+	// 状態の初期化
 	// --------------------------------------------------
+
+	var initBits []byte
+
+	if initMode == 0 {
+		const SEED_1 uint64 = 42
+		const SEED_2 uint64 = 85653950
+
+		r := rand.New(rand.NewPCG(SEED_1, SEED_2))
+
+		initBits, err = randomBits(r, bitLength)
+	} else {
+		initBitsStr, err := os.ReadFile("initBits")
+		if err != nil {
+			return err
+		}
+
+		// トリム
+		initBitsStr = bytes.TrimSpace(initBitsStr)
+
+		// 文字数が指定と一致しているかチェック
+		if len(initBitsStr) != bitLength {
+			return fmt.Errorf("./initBits の文字数 (%d) が bitLength (%d) と異なります", len(initBitsStr), bitLength)
+		}
+
+		initBits = make([]byte, bitLength)
+		for i, v := range initBitsStr {
+			if v == '0' || v == '1' {
+				initBits[i] = byte(v - '0')
+			} else {
+				return errors.New("./initBits に 0 1 以外の文字が含まれています")
+			}
+		}
+	}
 
 	return nil
 }
