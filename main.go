@@ -1,13 +1,14 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
-	"errors"
-	"fmt"
-	"math/rand/v2"
-	"os"
 	"strings"
+	"encoding/csv"
+	"fmt"
+	"io"
+	"os"
+	"strconv"
+
+	"golang.org/x/sync/errgroup"
 )
 
 func main() {
@@ -17,61 +18,115 @@ func main() {
 }
 
 func run() error {
-	// ハイパーパラメータ設定
-	// --------------------------------------------------
-	// ビット長
-	bitLength, err := getVal("ビット長 (デフォルト 100) : ", 3, 1000, 100)
+	file, err := os.Open("expCond.csv")
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+
+	// ヘッダー行を読み飛ばす
+	if _, err := reader.Read(); err != nil {
+		return err
+	}
+
+	var eg errgroup.Group
+
+	// 1行ずつ処理
+	for {
+		record, err := reader.Read()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		cond := record
+		eg.Go(func() error {
+			return runExp(cond)
+		})
+	}
+
+	return eg.Wait()
+}
+
+func runExp(cond []string) error {
+	// ハイパーパラメータの取得
+	bitLength, err := strconv.Atoi(cond[0])
+	if err != nil {
+		return err
+	}
+	rule, err := strconv.Atoi(cond[1])
+	if err != nil {
+		return err
+	}
+	step, err := strconv.Atoi(cond[2])
+	if err != nil {
+		return err
+	}
+	initBits, err := hexToBits(cond[3], bitLength)
 	if err != nil {
 		return err
 	}
 
-	// 初期化方法
-	initMode, err := getVal("初期化方法 {自動 0 / 手動 1} (デフォルト 自動): ", 0, 1, 0)
+	// ハイパーパラメータのチェック
+	if bitLength < 3 || bitLength > 1000 {
+		return fmt.Errorf("bitLength の値域が不正: %d", bitLength)
+	}
+	if rule < 0 || rule > 255 {
+		return fmt.Errorf("rule の値域が不正: %d", rule)
+	}
+	if step < 0 {
+		return fmt.Errorf("step の値域が不正: %d", step)
+	}
+	if len(initBits) != bitLength {
+		return fmt.Errorf("hexInitBits の長さが bitLength と一致しません")
+	}
+
+	// 結果保存ファイルの作成
+	os.MkdirAll("result", 0755)
+	fileName := fmt.Sprintf("result/%dbits_rule%d_%dsteps.txt", bitLength, rule, step)
+	file, err := os.Create(fileName)
 	if err != nil {
 		return err
 	}
+	defer file.Close()
 
-	// ルールナンバー
-	rules, err := getVal("ルールナンバー: ", 0, 255, -1)
-	if err != nil {
-		return err
+	// 実験の実行
+	var oldBits = initBits
+	var line strings.Builder
+
+	// 初期ビットのファイルへの書き込み
+	for _, v := range oldBits {
+		if v == 0 {
+			line.WriteString("░")
+		} else {
+			line.WriteString("█")
+		}
 	}
+	fmt.Fprintln(file, line.String())
 
-	// 状態の初期化
-	// --------------------------------------------------
-
-	var initBits []byte
-
-	if initMode == 0 {
-		const SEED_1 uint64 = 42
-		const SEED_2 uint64 = 85653950
-
-		r := rand.New(rand.NewPCG(SEED_1, SEED_2))
-
-		initBits, err = randomBits(r, bitLength)
-	} else {
-		initBitsStr, err := os.ReadFile("initBits")
+	for range step {
+		newBits, err := updateBits(oldBits, byte(rule))
 		if err != nil {
 			return err
 		}
 
-		// トリム
-		initBitsStr = bytes.TrimSpace(initBitsStr)
+		line.Reset()
 
-		// 文字数が指定と一致しているかチェック
-		if len(initBitsStr) != bitLength {
-			return fmt.Errorf("./initBits の文字数 (%d) が bitLength (%d) と異なります", len(initBitsStr), bitLength)
-		}
-
-		initBits = make([]byte, bitLength)
-		for i, v := range initBitsStr {
-			if v == '0' || v == '1' {
-				initBits[i] = byte(v - '0')
+		// ファイルへの書き込み
+		for _, v := range newBits {
+			if v == 0 {
+				line.WriteString("░")
 			} else {
-				return errors.New("./initBits に 0 1 以外の文字が含まれています")
+				line.WriteString("█")
 			}
 		}
+		fmt.Fprintln(file, line.String())
+
+		oldBits = newBits
 	}
+
+	return nil
 }
-
-
