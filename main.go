@@ -8,6 +8,9 @@ import (
 )
 
 func main() {
+	if err := run(); err != nil {
+		fmt.Println(err)
+	}
 }
 
 func run() (error) {
@@ -51,7 +54,7 @@ func run() (error) {
 		fmt.Println("./init100Bits を読み取りました")
 	}
 
-	
+	return  nil
 }
 
 // randomBits は、ランダムな100ビットを生成する関数
