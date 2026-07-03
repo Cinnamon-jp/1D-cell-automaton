@@ -1,12 +1,12 @@
 package main
 
 import (
-	"strings"
 	"encoding/csv"
 	"fmt"
 	"io"
 	"os"
 	"strconv"
+	"strings"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -85,7 +85,7 @@ func runExp(cond []string) error {
 	}
 
 	// 結果保存ファイルの作成
-	os.MkdirAll("result", 0755)
+	os.MkdirAll("result", 0o755)
 	fileName := fmt.Sprintf("result/%dbits_rule%d_%dsteps.txt", bitLength, rule, step)
 	file, err := os.Create(fileName)
 	if err != nil {
@@ -94,7 +94,7 @@ func runExp(cond []string) error {
 	defer file.Close()
 
 	// 実験の実行
-	var oldBits = initBits
+	oldBits := initBits
 	var line strings.Builder
 
 	// 初期ビットのファイルへの書き込み

@@ -10,8 +10,11 @@ import (
 	"strings"
 )
 
-const SEED_1 = 2669
-const SEED_2 = 175924051
+const (
+	SEED_1 = 2669
+	SEED_2 = 175924051
+)
+
 var r = rand.New(rand.NewPCG(SEED_1, SEED_2))
 
 func hexToBits(hex string, length int) ([]byte, error) {

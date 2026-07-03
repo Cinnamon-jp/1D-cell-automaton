@@ -27,7 +27,6 @@ func updateBits(oldBits []byte, rule byte) ([]byte, error) {
 	newBits := make([]byte, bitLength)
 	var target3Bits byte
 
-
 	for i := range oldBits {
 		if i != 0 {
 			target3Bits = oldBits[i-1]
