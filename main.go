@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -18,7 +19,34 @@ func main() {
 }
 
 func run() error {
-	file, err := os.Open("expCond.csv")
+	// カレントディレクトリの.csvファイルを列挙
+	entries, err := os.ReadDir(".")
+	if err != nil {
+		return err
+	}
+	var csvFiles []string
+	for _, e := range entries {
+		if !e.IsDir() && filepath.Ext(e.Name()) == ".csv" {
+			csvFiles = append(csvFiles, e.Name())
+		}
+	}
+	if len(csvFiles) == 0 {
+		return fmt.Errorf("CSVファイルが見つかりません")
+	}
+
+	// CSVファイルの選択
+	var csvName string
+	if len(csvFiles) == 1 {
+		csvName = csvFiles[0]
+	} else {
+		csvName = selector(csvFiles, "使用するCSVファイルを選択してください:")
+	}
+
+	// 出力ディレクトリ名の生成（拡張子なし + "_result"）
+	baseName := strings.TrimSuffix(csvName, filepath.Ext(csvName))
+	resultDir := baseName + "_result"
+
+	file, err := os.Open(csvName)
 	if err != nil {
 		return err
 	}
@@ -44,7 +72,7 @@ func run() error {
 		}
 		cond := record
 		eg.Go(func() error {
-			return runExp(cond)
+			return runExp(cond, resultDir)
 		})
 	}
 
@@ -75,7 +103,7 @@ func bitsToHalfBlock(upperBits, lowerBits []byte) string {
 	return sb.String()
 }
 
-func runExp(cond []string) error {
+func runExp(cond []string, resultDir string) error {
 	// ハイパーパラメータの取得
 	bitLength, err := strconv.Atoi(cond[0])
 	if err != nil {
@@ -123,8 +151,8 @@ func runExp(cond []string) error {
 	}
 
 	// 結果保存ファイルの作成
-	os.MkdirAll("result", 0o755)
-	fileName := fmt.Sprintf("result/%dbits_rule%d_%dsteps.txt", bitLength, rule, step)
+	os.MkdirAll(resultDir, 0o755)
+	fileName := fmt.Sprintf("%s/%dbits_rule%d_%dsteps.txt", resultDir, bitLength, rule, step)
 	file, err := os.Create(fileName)
 	if err != nil {
 		return err
