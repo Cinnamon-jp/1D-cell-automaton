@@ -50,7 +50,7 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	reader := csv.NewReader(file)
 
@@ -151,13 +151,15 @@ func runExp(cond []string, resultDir string) error {
 	}
 
 	// 結果保存ファイルの作成
-	os.MkdirAll(resultDir, 0o755)
+	if err := os.MkdirAll(resultDir, 0o755); err != nil {
+		return err
+	}
 	fileName := fmt.Sprintf("%s/%dbits_rule%d_%dsteps.txt", resultDir, bitLength, rule, step)
 	file, err := os.Create(fileName)
 	if err != nil {
 		return err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// 2行ずつペアにして半ブロック文字で書き込み
 	for i := 0; i < len(allRows); i += 2 {
@@ -165,7 +167,9 @@ func runExp(cond []string, resultDir string) error {
 		if i+1 < len(allRows) {
 			lowerBits = allRows[i+1]
 		}
-		fmt.Fprintln(file, bitsToHalfBlock(allRows[i], lowerBits))
+		if _, err := fmt.Fprintln(file, bitsToHalfBlock(allRows[i], lowerBits)); err != nil {
+			return err
+		}
 	}
 
 	return nil
