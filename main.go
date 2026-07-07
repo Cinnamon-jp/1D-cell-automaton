@@ -51,6 +51,30 @@ func run() error {
 	return eg.Wait()
 }
 
+// bitsToHalfBlock は、2行分のビット列を半ブロック文字の文字列に変換する。
+// upperBits が上半分、lowerBits が下半分を表す。
+// lowerBits が nil の場合は下半分をすべてOFFとして処理する。
+func bitsToHalfBlock(upperBits, lowerBits []byte) string {
+	var sb strings.Builder
+	for i, upper := range upperBits {
+		var lower byte
+		if lowerBits != nil {
+			lower = lowerBits[i]
+		}
+		switch {
+		case upper == 0 && lower == 0:
+			sb.WriteRune(' ')
+		case upper == 1 && lower == 0:
+			sb.WriteRune('▀')
+		case upper == 0 && lower == 1:
+			sb.WriteRune('▄')
+		case upper == 1 && lower == 1:
+			sb.WriteRune('█')
+		}
+	}
+	return sb.String()
+}
+
 func runExp(cond []string) error {
 	// ハイパーパラメータの取得
 	bitLength, err := strconv.Atoi(cond[0])
@@ -84,6 +108,20 @@ func runExp(cond []string) error {
 		return fmt.Errorf("hexInitBits の長さが bitLength と一致しません")
 	}
 
+	// 全ステップのビット列を蓄積（初期ビット + step回分）
+	allRows := make([][]byte, 0, step+1)
+	allRows = append(allRows, initBits)
+
+	oldBits := initBits
+	for range step {
+		newBits, err := updateBits(oldBits, byte(rule))
+		if err != nil {
+			return err
+		}
+		allRows = append(allRows, newBits)
+		oldBits = newBits
+	}
+
 	// 結果保存ファイルの作成
 	os.MkdirAll("result", 0o755)
 	fileName := fmt.Sprintf("result/%dbits_rule%d_%dsteps.txt", bitLength, rule, step)
@@ -93,39 +131,13 @@ func runExp(cond []string) error {
 	}
 	defer file.Close()
 
-	// 実験の実行
-	oldBits := initBits
-	var line strings.Builder
-
-	// 初期ビットのファイルへの書き込み
-	for _, v := range oldBits {
-		if v == 0 {
-			line.WriteString("░")
-		} else {
-			line.WriteString("█")
+	// 2行ずつペアにして半ブロック文字で書き込み
+	for i := 0; i < len(allRows); i += 2 {
+		var lowerBits []byte
+		if i+1 < len(allRows) {
+			lowerBits = allRows[i+1]
 		}
-	}
-	fmt.Fprintln(file, line.String())
-
-	for range step {
-		newBits, err := updateBits(oldBits, byte(rule))
-		if err != nil {
-			return err
-		}
-
-		line.Reset()
-
-		// ファイルへの書き込み
-		for _, v := range newBits {
-			if v == 0 {
-				line.WriteString("░")
-			} else {
-				line.WriteString("█")
-			}
-		}
-		fmt.Fprintln(file, line.String())
-
-		oldBits = newBits
+		fmt.Fprintln(file, bitsToHalfBlock(allRows[i], lowerBits))
 	}
 
 	return nil
